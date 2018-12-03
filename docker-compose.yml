@@ -1,0 +1,98 @@
+
+version: '3'
+
+networks:
+  appsys:
+
+services:
+  appsys:
+    image: registry.academic.systems/appsys:latest
+    container_name: 'appsys'
+    hostname: appsys
+    ports:
+      - 8080:80
+      - 8443:443
+    volumes:
+      # if on SE linux, append :z like -> appsys-data:/var/www:z
+      - appsys-data:/var/data
+      - appsys-php:/var/php
+      - appsys-simplesaml:/var/simplesamlphp/config
+      - appsys-nginx:/etc/nginx/conf.d
+    networks:
+      appsys:
+    restart: always
+  shibboleth:
+    image: asystems/shibboleth
+    container_name: 'appsys-shibboleth'
+    hostname: shibboleth
+    expose:
+      - 9000 # shibauthorizer
+      - 9001 # shibresponder
+    volumes:
+      - appsys-shibboleth:/etc/shibboleth
+    networks:
+      appsys:
+    restart: always
+  mongo:
+    image: mongo
+    container_name: 'appsys-mongo'
+    hostname: mongo
+    volumes:
+      - appsys-mongo:/data/db
+      - appsys-mongo-config:/docker-entrypoint-initdb.d # setup.sh
+    networks:
+      appsys:
+    restart: always
+  php:
+    image: php:7.1-fpm-alpine
+    container_name: 'appsys-php'
+    hostname: php
+    expose:
+      - 9000
+    volumes:
+      - appsys-data:/var/data
+      - appsys-php:/var/www
+    networks:
+      appsys:
+    restart: always
+  mail:
+    image: asystems/mail
+    container_name: 'appsys-mail'
+    hostname: mail
+    expose:
+      - 80
+      - 443
+    environment:
+      # your domain name, i.e. university.edu
+      - DOMAIN=${APPSYS_HOSTNAME}
+    networks:
+      appsys:
+    restart: always
+  # this container purely exists for inspecting and modifying configuration files and data
+  edit:
+    image: alpine
+    container_name: 'appsys-edit'
+    hostname: edit
+    command: tail -f /dev/null
+    networks:
+      appsys:
+    volumes:
+      # if on SE linux, append :z like -> appsys-data:/var/www:z
+      - appsys-data:/appsys
+      - appsys-nginx:/nginx
+      - appsys-mongo-config:/mongo
+      - appsys-simplesaml:/simplesaml
+      - appsys-shibboleth:/shibboleth
+
+volumes:
+  appsys-data:
+  appsys-php:
+  appsys-mongo:
+  appsys-nginx:
+    external: true
+  appsys-mongo-config:
+    external: true
+  appsys-simplesaml:
+    external: true
+  appsys-shibboleth:
+    external: true
